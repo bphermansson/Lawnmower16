@@ -21,11 +21,14 @@ git push origin master
 
 /*
 HC-SR04 Ping distance sensor]
-VCC to arduino 5v GND to arduino GND
-Echo to Arduino pin 13 Trig to Arduino pin 12
-Red POS to Arduino pin 11
-Green POS to Arduino pin 10
-560 ohm resistor to both LED NEG and GRD power rail
+VCC to arduino 5v 
+GND to arduino GND
+Echo to Arduino pin 9 
+Trig to Arduino pin 8
+
+Red POS to Arduino pin 11 ?
+Green POS to Arduino pin 10 ? 
+560 ohm resistor to both LED NEG and GRD power rail ?
 More info at: http://goo.gl/kJ8Gl
 Original code improvements to the Ping sketch sourced from Trollmaker.com
 Some code and wiring inspired by http://en.wikiversity.org/wiki/User:Dstaub/robotcar
@@ -109,6 +112,7 @@ void setup() {
   lcd.setCursor(0, 1); // bottom left
   lcd.print("Dist: ");
   lcd.print(dist);
+  
   /*
   pinMode(lednear, OUTPUT);
   // Test led near
@@ -180,19 +184,28 @@ void setup() {
 }
 
 void loop() {
+
+  Serial.println("--------------------");
+  
   // Measure distance
   long dist = distance();
   lcd.setCursor(0, 1); // bottom left
+  lcd.print ("           ");
   lcd.print("Dist: ");
   lcd.print(dist);
 
-  Serial.println("--------------------");
   Serial.print("Distance: ");
   Serial.println(dist/100);
   
   //lcd.clear();
-  batt();
-  current();
+
+  // Check battery voltage
+  int battv = batt();
+
+  // Check current
+  int cAmp = current();
+
+  // Heartbeat on LCD
   if (status) {
     status=false;
     lcd.setCursor(15, 1); 
@@ -203,11 +216,30 @@ void loop() {
     lcd.setCursor(15, 1); 
     lcd.print("-");
   }
+
+  // Do something if we are near an object
+
+  // Do something if the bettery is low
+  if (battv<9) {
+    Serial.println("BATTERY LOW!");
+    lcd.clear();
+    lcd.home();
+    lcd.print ("BATTERY LOW!");
+    while (1);
+  }
+
+  // Do something if the current is too high
+
+  // Wait for next round
   delay(3000); 
  
 }
 
-void batt() {
+//float batt() {
+int batt() {
+
+// Does this have to be a float?
+  
   // Check battery monitor
   // (10.80V from PSU. 3.39 after divider)
   Serial.println("DC VOLTMETER");
@@ -215,7 +247,7 @@ void batt() {
   Serial.print((int)(vPow / (r2 / (r1 + r2))));
   Serial.println("V");
   // Read AD and convert value
-  float adcvalue = analogRead(voltsens);
+  int adcvalue = analogRead(voltsens);  // No need for a float here?
   float v = (adcvalue * vPow) / 1024.0;
   float v2 = v / (r2 / (r1 + r2));
   // Correction
@@ -232,14 +264,16 @@ void batt() {
   lcd.print("V"); 
 }
 
-void current(){
+//double current(){
+int current(){
+    
   // Measure total power consumption
   RawValue = analogRead(analogIn);
   Voltage = (RawValue / 1024.0) * 5020; // Gets you mV
   Amps = ((Voltage - ACSoffset) / mVperAmp);
 
-  Serial.print("Amps ADC value: ");
-  Serial.println(RawValue);
+  //Serial.print("Amps ADC value: ");
+  //Serial.println(RawValue);
   Serial.print("Calculated amps ");
   Serial.println(Amps);
   
@@ -247,82 +281,6 @@ void current(){
   lcd.print("I="); 
   lcd.print(Amps); 
   lcd.print("A");  
-}
-
-void fwd_fast() {
-  lcd.setCursor (0,1); 
-  lcd.print("Fwd fast");
-
-  analogWrite(speedPinA, 255);//Sets speed variable via PWM 
-  analogWrite(speedPinB, 255);
-  digitalWrite(dir1PinA, LOW);
-  digitalWrite(dir2PinA, HIGH);
-  digitalWrite(dir1PinB, LOW);
-  digitalWrite(dir2PinB, HIGH);
-}
-void fwd_slow() {
-  // Framåt -> dir1PinA + dir1PinB hög, dir2PinA + dir2PinB låg?
-
-  lcd.setCursor (0,1); 
-  lcd.print("Fwd slow");
-
-  analogWrite(speedPinA, 100);//Sets speed variable via PWM 
-  analogWrite(speedPinB, 100);
-  digitalWrite(dir1PinA, LOW);
-  digitalWrite(dir2PinA, HIGH);
-  digitalWrite(dir1PinB, LOW);
-  digitalWrite(dir2PinB, HIGH);
-}
-void rev_fast() {
-  lcd.setCursor (0,1); 
-  lcd.print("Rev fast");
-  analogWrite(speedPinA, 255);//Sets speed variable via PWM 
-  analogWrite(speedPinB, 255);
-  digitalWrite(dir1PinA, HIGH);
-  digitalWrite(dir2PinA, LOW);
-  digitalWrite(dir1PinB, HIGH);
-  digitalWrite(dir2PinB, LOW);
-}
-void rev_slow() {
-  lcd.setCursor (0,1); 
-  lcd.print("Rev slow");
-  analogWrite(speedPinA, 100);//Sets speed variable via PWM 
-  analogWrite(speedPinB, 100);
-  digitalWrite(dir1PinA, HIGH);
-  digitalWrite(dir2PinA, LOW);
-  digitalWrite(dir1PinB, HIGH);
-  digitalWrite(dir2PinB, LOW);
-}
-void stop() {
-  lcd.setCursor (0,1); 
-  lcd.print("Stop");
-  Serial.println("Stop");
-  analogWrite(speedPinA, 0);
-  digitalWrite(dir1PinA, LOW);
-  digitalWrite(dir2PinA, HIGH);
-  analogWrite(speedPinB, 0);
-  digitalWrite(dir1PinB, LOW);
-  digitalWrite(dir2PinB, HIGH);
-}
-void rotateL() {
-  lcd.setCursor (0,1); 
-  lcd.print("RotateL      ");
-  analogWrite(speedPinA, 100);//Sets speed variable via PWM 
-  analogWrite(speedPinB, 100);
-  digitalWrite(dir1PinA, HIGH);
-  digitalWrite(dir2PinA, LOW);
-  digitalWrite(dir1PinB, LOW);
-  digitalWrite(dir2PinB, HIGH);
-}
-void rotateR() {
-  lcd.setCursor (0,1); 
-  lcd.print("RotateR          ");
-  analogWrite(speedPinA, 100);//Sets speed variable via PWM 
-  analogWrite(speedPinB, 100);
-  digitalWrite(dir1PinA, LOW);
-  digitalWrite(dir2PinA, HIGH);
-  digitalWrite(dir1PinB, HIGH);
-  digitalWrite(dir2PinB, LOW);
 }
 
 long distance() {
