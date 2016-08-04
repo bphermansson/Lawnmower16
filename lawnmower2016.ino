@@ -14,6 +14,9 @@ Two electrical motors are used for moving and turning, controlled by a L298N-bas
 (code inspired by http://www.instructables.com/id/Arduino-Modules-L298N-Dual-H-Bridge-Motor-Controll/?ALLSTEPS)
 LCD: https://alselectro.wordpress.com/2016/05/12/serial-lcd-i2c-module-pcf8574/
 
+Wireless programming/control via ESP8266: http://www.patrikhermansson.se/?q=node/520
+avrdude -C/home/patrik/.arduino15/packages/arduino/tools/avrdude/6.3.0-arduino2/etc/avrdude.conf -v -patmega328p -carduino -P net:192.168.1.130:23 -b57600 -D -Uflash:w:/tmp/builde2680df248d7f8adec6f6bb45c90d9b2.tmp/lawnmower2016.ino.hex:i
+
 Reminder on Git:
 git commit lawnmower_15.ino
 git push origin master
@@ -68,6 +71,7 @@ int speedPinB = 6; // Needs to be a PWM pin to be able to control motor speed
 //#define ledstuck 
 
 bool status=true;
+bool error=false;
 
 //Measuring Current Using ACS712
 const int analogIn = A0;
@@ -92,7 +96,7 @@ int dir;
 */
 
 void setup() {
-  Serial.begin (9600);
+  Serial.begin (57600);
   Serial.println("Welcome to Lawnmower16!"); 
 
   // activate LCD module
@@ -156,6 +160,7 @@ void setup() {
 
   Serial.println("Setup done");
 
+/*
   // Hardware test, lets dance!
   lcd.setCursor(0, 1); // bottom left
   lcd.print("Dance!");
@@ -177,6 +182,8 @@ void setup() {
   rotateL();
   delay (1000);
   stop();
+*/
+  
   lcd.setCursor(0, 1); // bottom left
   lcd.print("All done");
   
@@ -184,26 +191,70 @@ void setup() {
 }
 
 void loop() {
-
+  lcd.clear();
   Serial.println("--------------------");
   
   // Measure distance
   long dist = distance();
-  lcd.setCursor(0, 1); // bottom left
+  lcd.setCursor(0, 0); // bottom left
   lcd.print ("           ");
-  lcd.print("Dist: ");
+  lcd.print("D:");
   lcd.print(dist);
-
+  lcd.print(" ");
   Serial.print("Distance: ");
   Serial.println(dist/100);
-  
-  //lcd.clear();
+  // Do something if we are near an object
+  if (dist<1000) {
+    stop();
+    delay(1000);
+    rotateL();
+    delay(3000);
+    stop();
+    delay(100);
 
+  }
+  
   // Check battery voltage
   int battv = batt();
+  lcd.print("B:");
+  lcd.print(battv/100);
+  lcd.print(" ");
+  Serial.print ("B: ");
+  Serial.println(battv/100);
+  // Do something if the battery is low
+  if ((battv/100)<=9) {
+    Serial.println("BATTERY LOW!");
+    lcd.clear();
+    lcd.home();
+    lcd.print ("BATTERY LOW!");
+    lcd.setCursor(0, 1); // bottom left
+    lcd.print ("B:");
+    lcd.print(battv);
+    // Set error flag
+    error=true;
+  }
 
   // Check current
   int cAmp = current();
+  lcd.print("I:");
+  lcd.print(cAmp);
+  lcd.print(" ");
+  // Do something if the current is too high
+  /*if (cAmp>){
+    error=true;
+    }
+  */
+
+  if (error==false) {
+    Serial.println ("All ok, forward");
+    //fwd_slow();
+  }
+  else {
+    stop();
+    lcd.setCursor(0, 1); // bottom left
+    lcd.print ("           ");
+    lcd.print("ERROR");
+  }
 
   // Heartbeat on LCD
   if (status) {
@@ -217,21 +268,8 @@ void loop() {
     lcd.print("-");
   }
 
-  // Do something if we are near an object
-
-  // Do something if the bettery is low
-  if (battv<9) {
-    Serial.println("BATTERY LOW!");
-    lcd.clear();
-    lcd.home();
-    lcd.print ("BATTERY LOW!");
-    while (1);
-  }
-
-  // Do something if the current is too high
-
   // Wait for next round
-  delay(3000); 
+  delay(1000); 
  
 }
 
@@ -257,11 +295,18 @@ int batt() {
   Serial.print("Battery voltage: ");
   Serial.print(v2);
   Serial.println(" volt.");
-  
+
+  // Convert to int
+  v2=v2*100;
+  int batt=(int) v2;
+  //Serial.println(batt);
+    
   lcd.home();
   lcd.print("U="); 
   lcd.print(v2); 
   lcd.print("V"); 
+
+  return batt;
 }
 
 //double current(){
