@@ -18,7 +18,7 @@ Wireless programming/control via ESP8266: http://www.patrikhermansson.se/?q=node
 avrdude -C/home/patrik/.arduino15/packages/arduino/tools/avrdude/6.3.0-arduino2/etc/avrdude.conf -v -patmega328p -carduino -P net:192.168.1.130:23 -b57600 -D -Uflash:w:/tmp/builde2680df248d7f8adec6f6bb45c90d9b2.tmp/lawnmower2016.ino.hex:i
 
 Reminder on Git:
-git commit lawnmower_15.ino
+git commit lawnmower2016.ino
 git push origin master
 */
 
@@ -72,6 +72,7 @@ int speedPinB = 6; // Needs to be a PWM pin to be able to control motor speed
 
 bool status=true;
 bool error=false;
+bool run=false;
 
 //Measuring Current Using ACS712
 const int analogIn = A0;
@@ -114,8 +115,9 @@ void setup() {
   // Measure distance
   long dist = distance();
   lcd.setCursor(0, 1); // bottom left
-  lcd.print("Dist: ");
+  lcd.print("D: ");
   lcd.print(dist);
+  delay(1000);
   
   /*
   pinMode(lednear, OUTPUT);
@@ -131,8 +133,8 @@ void setup() {
   digitalWrite(ledstuck, LOW);
   */
 
-  lcd.setCursor(0, 1); // bottom left
-  lcd.print("Led tests done"); 
+  //lcd.setCursor(0, 1); // bottom left
+  //lcd.print("Led tests done"); 
      
   //Define L298N Dual H-Bridge Motor Controller Pins
   pinMode(dir1PinA,OUTPUT);
@@ -153,7 +155,16 @@ void setup() {
   pinMode(lowbattled, OUTPUT);
   pinMode(voltsens, INPUT);
   
-  batt();
+  int battv = batt();
+  Serial.print ("B: ");
+  Serial.print(battv);
+  Serial.println("V");
+
+  delay(100);
+
+  lcd.print("B: ");
+  lcd.print(battv);
+  
   current();
 
   delay(3000);
@@ -186,23 +197,41 @@ void setup() {
   
   lcd.setCursor(0, 1); // bottom left
   lcd.print("All done");
-  
+  delay(500);
 
 }
 
 void loop() {
+  // if there's any serial available, read it:
+  while (Serial.available() > 0) {
+      int command = Serial.parseInt();
+      Serial.println("Got serial data");
+      // look for the newline. That's the end of your sentence:
+      if (Serial.read() == '\n') {
+        Serial.print("Got: ");
+        Serial.println(command);
+        if (command==1) {
+          Serial.print ("Run!");
+          run=true;
+        }
+        else if (command==2) {
+          Serial.print ("Stop!");     
+          run=false;     
+        }
+      }
+  }
   lcd.clear();
-  Serial.println("--------------------");
+  Serial.println("----");
   
   // Measure distance
   long dist = distance();
-  lcd.setCursor(0, 0); // bottom left
-  lcd.print ("           ");
+  lcd.setCursor(0, 0); // top left
   lcd.print("D:");
   lcd.print(dist);
   lcd.print(" ");
-  Serial.print("Distance: ");
-  Serial.println(dist/100);
+  delay(100);
+  Serial.print("D: ");
+  Serial.println(dist);
   // Do something if we are near an object
   if (dist<1000) {
     stop();
@@ -216,24 +245,42 @@ void loop() {
   
   // Check battery voltage
   int battv = batt();
+  // battv is like '126' (12.6V)
+  int binteger = battv/10;  // = 12
+  int temp = (binteger*10); // = 120
+  int bdec = battv - temp;  // = 6 
+  String batt_text = String(binteger + "." + bdec);
+  
   lcd.print("B:");
-  lcd.print(battv/100);
+  lcd.print(batt_text);
   lcd.print(" ");
+  
   Serial.print ("B: ");
-  Serial.println(battv/100);
+  Serial.print(batt_text);
+  Serial.println("V");
+  /*
+  Serial.print ("Battv: ");
+  Serial.println (battv);
+  Serial.print("bint: ");
+  Serial.println(binteger);
+  Serial.print("bdec: ");
+  Serial.println(bdec);
+  */
   // Do something if the battery is low
-  if ((battv/100)<=9) {
+  /*
+  if ((binteger)<=9) {
     Serial.println("BATTERY LOW!");
+    Serial.println("B:" + batt_text);
     lcd.clear();
     lcd.home();
     lcd.print ("BATTERY LOW!");
     lcd.setCursor(0, 1); // bottom left
     lcd.print ("B:");
-    lcd.print(battv);
+    lcd.print(batt_text);
     // Set error flag
     error=true;
   }
-
+*/
   // Check current
   int cAmp = current();
   lcd.print("I:");
@@ -245,11 +292,11 @@ void loop() {
     }
   */
 
-  if (error==false) {
+  if (error==false && run==true) {
     Serial.println ("All ok, forward");
     //fwd_slow();
   }
-  else {
+  else if (error==false){
     stop();
     lcd.setCursor(0, 1); // bottom left
     lcd.print ("           ");
@@ -269,7 +316,7 @@ void loop() {
   }
 
   // Wait for next round
-  delay(1000); 
+  delay(2000); 
  
 }
 
@@ -280,32 +327,39 @@ int batt() {
   
   // Check battery monitor
   // (10.80V from PSU. 3.39 after divider)
-  Serial.println("DC VOLTMETER");
-  Serial.print("Maximum Voltage: ");
-  Serial.print((int)(vPow / (r2 / (r1 + r2))));
-  Serial.println("V");
+  //Serial.println("DC VOLTMETER");
+  //Serial.print("Maximum Voltage: ");
+  //Serial.print((int)(vPow / (r2 / (r1 + r2))));
+  //Serial.println("V");
   // Read AD and convert value
   int adcvalue = analogRead(voltsens);  // No need for a float here?
+  vPow = 15;
+  int volt = (adcvalue * vPow) / 1024.0;
+  int volt2 = volt / (r2 / (r1 + r2));
+  Serial.print("volt: ");
+  Serial.println(volt2);
   float v = (adcvalue * vPow) / 1024.0;
   float v2 = v / (r2 / (r1 + r2));
   // Correction
   v2=v2-0.2;
+  /*
   Serial.print("Battery monitor ADC: ");
   Serial.println(adcvalue);
   Serial.print("Battery voltage: ");
   Serial.print(v2);
   Serial.println(" volt.");
-
+*/
   // Convert to int
-  v2=v2*100;
+  v2=v2*10;
   int batt=(int) v2;
   //Serial.println(batt);
-    
+
+  /*  
   lcd.home();
   lcd.print("U="); 
   lcd.print(v2); 
   lcd.print("V"); 
-
+  */
   return batt;
 }
 
